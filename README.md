@@ -1,3 +1,5 @@
+This code was written by ChatGPT using my instructor's prompts, and I make no claim to its construction, accuracy, or utility. This is not my work, but it was uploaded with permission.
+
 # Tree Model Cross-Validation Studio
 
 A professional Streamlit dashboard for benchmarking tree-based machine learning models across uploaded datasets.
