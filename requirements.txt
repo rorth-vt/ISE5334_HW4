@@ -8,4 +8,4 @@ lightgbm>=4.5
 catboost>=1.2
 seaborn
 matplotlib
-pywt
+PyWavelets
