@@ -40,7 +40,7 @@ from sklearn.neighbors import NearestNeighbors
 from sklearn.cluster import KMeans
 
 from pathlib import Path
-import umap
+# import umap
 
 # -------------------------
 # PATHS
