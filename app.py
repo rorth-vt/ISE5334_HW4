@@ -9,6 +9,7 @@ import streamlit as st
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+import seaborn as sns
 
 from plyfile import PlyData
 from pathlib import Path
@@ -18,21 +19,14 @@ from sklearn.cluster import DBSCAN, KMeans
 from sklearn.preprocessing import StandardScaler
 from sklearn.pipeline import Pipeline
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import accuracy_score, f1_score
+from sklearn.metrics import accuracy_score, f1_score, confusion_matrix
 
-from sklearn.linear_model import LogisticRegression, SGDClassifier, PassiveAggressiveClassifier
-from sklearn.svm import SVC
-from sklearn.neighbors import KNeighborsClassifier, RadiusNeighborsClassifier, NearestNeighbors
 from sklearn.ensemble import (
     RandomForestClassifier, GradientBoostingClassifier,
     AdaBoostClassifier, ExtraTreesClassifier, BaggingClassifier
 )
 from sklearn.tree import DecisionTreeClassifier
-from sklearn.naive_bayes import GaussianNB
-from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
-from sklearn.neural_network import MLPClassifier
-from sklearn.gaussian_process import GaussianProcessClassifier
-from sklearn.gaussian_process.kernels import RBF
+from sklearn.neighbors import NearestNeighbors
 from scipy.spatial import ConvexHull
 
 # -------------------------
@@ -43,35 +37,43 @@ FEASIBLE_PATH = BASE_DIR / "Data" / "feasible"
 INFEASIBLE_PATH = BASE_DIR / "Data" / "infeasible"
 
 st.set_page_config(layout="wide")
-st.title("3D Point Cloud Model Explorer")
+st.title("3D Point Cloud Explorer")
 
 # -------------------------
-# SESSION STATE INIT
+# SESSION STATE
 # -------------------------
-for key in ["data", "X", "y", "results"]:
+for key in ["data", "X", "y", "results", "Xte", "yte", "models"]:
     if key not in st.session_state:
         st.session_state[key] = None
 
 # -------------------------
-# LOAD
+# LOAD + BUILD (COMBINED)
 # -------------------------
 def load_xyz_from_ply(path):
     ply = PlyData.read(path)
     v = ply['vertex'].data
     return pd.DataFrame({"X": v["x"], "Y": v["y"], "Z": v["z"]})
 
-def read_data(nf, ni):
+def load_and_build(nf, ni):
     data = {}
-    feasible_files = sorted(FEASIBLE_PATH.glob("*.ply"))
-    infeasible_files = sorted(INFEASIBLE_PATH.glob("*.ply"))
 
-    for i, f in enumerate(feasible_files[:nf]):
+    feasible_files = sorted(FEASIBLE_PATH.glob("*.ply"))[:nf]
+    infeasible_files = sorted(INFEASIBLE_PATH.glob("*.ply"))[:ni]
+
+    for i, f in enumerate(feasible_files):
         data[f"feasible_{i}"] = load_xyz_from_ply(str(f))
 
-    for i, f in enumerate(infeasible_files[:ni]):
+    for i, f in enumerate(infeasible_files):
         data[f"infeasible_{i}"] = load_xyz_from_ply(str(f))
 
-    return data
+    X, y = [], []
+    for k, df in data.items():
+        df = df[df["Z"] > df["Z"].min() + 2]
+
+        X.append(extract_features(df))
+        y.append(k.startswith("feasible"))
+
+    return data, np.array(X), np.array(y)
 
 # -------------------------
 # FEATURES (UNCHANGED)
@@ -130,25 +132,11 @@ def extract_features(df):
 
     return np.array(feats)
 
-def build_dataset(data, filtered=True):
-    X, y = [], []
-    for k, df in data.items():
-        if filtered:
-            df = df[df["Z"] > df["Z"].min() + 2]
-
-        X.append(extract_features(df))
-        y.append(k.startswith("feasible"))
-
-    return np.array(X), np.array(y)
-
 # -------------------------
-# MODELS (UNCHANGED)
+# MODELS
 # -------------------------
 def generate_models():
-    models = {}
-    scalers = [None, StandardScaler()]
-
-    classifiers = {
+    return {
         "decision_tree": DecisionTreeClassifier(),
         "random_forest": RandomForestClassifier(),
         "gradient_boosting": GradientBoostingClassifier(),
@@ -156,19 +144,6 @@ def generate_models():
         "extra_trees": ExtraTreesClassifier(),
         "bagging": BaggingClassifier(),
     }
-
-    count = 0
-    for scaler in scalers:
-        for name, clf in classifiers.items():
-            steps = []
-            if scaler:
-                steps.append(("scaler", scaler))
-            steps.append(("clf", clf))
-
-            models[f"{name}_{'scaled' if scaler else 'noscale'}"] = Pipeline(steps)
-            count += 1
-
-    return models
 
 # -------------------------
 # TRAIN
@@ -180,104 +155,118 @@ def run_models(X, y):
 
     models = generate_models()
     results = {}
+    trained = {}
 
     for name, m in models.items():
-        try:
-            m.fit(Xtr, ytr)
-            preds = m.predict(Xte)
-        except:
-            preds = np.zeros_like(yte)
+        m.fit(Xtr, ytr)
+        preds = m.predict(Xte)
 
         results[name] = {
             "accuracy": accuracy_score(yte, preds),
             "f1": f1_score(yte, preds)
         }
+        trained[name] = m
 
-    return results
+    return results, trained, Xte, yte
 
 # =========================
-# SIDEBAR CONTROLS
+# SIDEBAR
 # =========================
 st.sidebar.header("Controls")
 
-nf = st.sidebar.slider("Feasible samples", 1, 10, 5)
-ni = st.sidebar.slider("Infeasible samples", 1, 10, 5)
+nf = st.sidebar.slider("Feasible samples", 1, 5, 3)
+ni = st.sidebar.slider("Infeasible samples", 1, 5, 3)
 
-# -------------------------
-# BUTTONS (CRITICAL CHANGE)
-# -------------------------
-if st.sidebar.button("1. Load Data"):
-    st.session_state.data = read_data(nf, ni)
-    st.success("Data loaded")
+if st.sidebar.button("1. Load + Build Dataset"):
+    data, X, y = load_and_build(nf, ni)
+    st.session_state.data = data
+    st.session_state.X = X
+    st.session_state.y = y
+    st.success("Dataset ready")
 
-if st.sidebar.button("2. Build Dataset"):
-    if st.session_state.data is None:
-        st.warning("Load data first")
-    else:
-        X, y = build_dataset(st.session_state.data)
-        st.session_state.X = X
-        st.session_state.y = y
-        st.success("Dataset built")
-
-if st.sidebar.button("3. Train Models"):
+if st.sidebar.button("2. Train Models"):
     if st.session_state.X is None:
         st.warning("Build dataset first")
     else:
-        st.session_state.results = run_models(
+        results, models, Xte, yte = run_models(
             st.session_state.X,
             st.session_state.y
         )
+        st.session_state.results = results
+        st.session_state.models = models
+        st.session_state.Xte = Xte
+        st.session_state.yte = yte
         st.success("Training complete")
 
 # =========================
-# MAIN UI
+# TABS
 # =========================
-
-tab1, tab2 = st.tabs(["Model Viewer", "Comparison"])
+tab1, tab2, tab3 = st.tabs(["Point Cloud Viewer", "Model Viewer", "Comparison"])
 
 # -------------------------
-# TAB 1: SIDE-BY-SIDE MODELS
+# TAB 1: VISUALIZATION
 # -------------------------
 with tab1:
-    if st.session_state.results:
-        models = list(st.session_state.results.keys())
+    if st.session_state.data:
+        key = st.selectbox("Select point cloud", list(st.session_state.data.keys()))
+        df = st.session_state.data[key]
 
         col1, col2 = st.columns(2)
 
         with col1:
-            m1 = st.selectbox("Model A", models, key="m1")
-        with col2:
-            m2 = st.selectbox("Model B", models, key="m2")
-
-        col1, col2 = st.columns(2)
-
-        with col1:
-            st.subheader(m1)
-            st.write(st.session_state.results[m1])
+            st.subheader("3D View")
+            fig = plt.figure()
+            ax = fig.add_subplot(111, projection='3d')
+            ax.scatter(df["X"], df["Y"], df["Z"], s=1)
+            st.pyplot(fig)
 
         with col2:
-            st.subheader(m2)
-            st.write(st.session_state.results[m2])
+            st.subheader("PCA Projection")
+            xyz = df[["X","Y","Z"]].values
+            reduced = PCA(n_components=2).fit_transform(xyz)
+
+            fig2, ax2 = plt.subplots()
+            ax2.scatter(reduced[:,0], reduced[:,1], s=2)
+            st.pyplot(fig2)
 
 # -------------------------
-# TAB 2: COMPARISON PLOT
+# TAB 2: MODEL DETAILS
 # -------------------------
 with tab2:
+    if st.session_state.results:
+        model_name = st.selectbox("Model", list(st.session_state.results.keys()))
+        metrics = st.session_state.results[model_name]
+
+        st.write(metrics)
+
+        model = st.session_state.models[model_name]
+        preds = model.predict(st.session_state.Xte)
+
+        cm = confusion_matrix(st.session_state.yte, preds)
+
+        fig, ax = plt.subplots()
+        sns.heatmap(cm, annot=True, fmt="d", cmap="Blues", ax=ax)
+        ax.set_title("Confusion Matrix")
+        st.pyplot(fig)
+
+# -------------------------
+# TAB 3: COMPARISON
+# -------------------------
+with tab3:
     if st.session_state.results:
         results = st.session_state.results
 
         selected = st.multiselect(
-            "Select models to compare",
+            "Select models",
             list(results.keys()),
-            default=list(results.keys())[:4]
+            default=list(results.keys())
         )
 
-        if selected:
-            accs = [results[m]["accuracy"] for m in selected]
+        accs = [results[m]["accuracy"] for m in selected]
 
-            fig, ax = plt.subplots()
-            ax.bar(selected, accs)
-            ax.set_ylabel("Accuracy")
-            ax.set_xticklabels(selected, rotation=45, ha="right")
+        fig, ax = plt.subplots()
+        ax.bar(selected, accs)
+        ax.set_ylabel("Accuracy")
+        ax.set_xticklabels(selected, rotation=45, ha="right")
 
-            st.pyplot(fig)
+        st.pyplot(fig)
