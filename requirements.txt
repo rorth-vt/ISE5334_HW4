@@ -9,3 +9,4 @@ catboost>=1.2
 seaborn
 matplotlib
 PyWavelets
+plyfile
