@@ -1,80 +1,139 @@
-This code was written by ChatGPT using prompts from my instructor and myself, and I make no claim to its construction, accuracy, or utility. This is not my work, but it was uploaded with permission.
+This code was written by ChatGPT, and I make no claim to its construction, accuracy, or utility for any real use case.
 
-# Tree Model Cross-Validation Studio
+# 3D Point Cloud Classification Explorer
 
-A professional Streamlit dashboard for benchmarking tree-based machine learning models across uploaded datasets.
+An interactive Streamlit app for exploring machine learning models on 3D point cloud data. This project extracts geometric features from .ply files and evaluates a wide range of classifiers (~50 pipelines) to distinguish between feasible and infeasible samples.
 
-## What the app does
-
-- Upload multiple CSV files and Excel workbooks
-- Select target and feature columns for each dataset
-- Run cross-validation for tree-based models
-- Support both classification and regression workflows
-- Export benchmark summaries to Excel, CSV, and JSON
-- Display feature importance for fitted tree models
-
-## Included model families
-
-Implemented and benchmarked in the dashboard:
-- CART
-- Random Forest
-- Extra Trees
-- Gradient Boosting
-- AdaBoost
-- XGBoost (optional dependency)
-- LightGBM (optional dependency)
-- CatBoost (optional dependency)
-
-Included as documentation notes only, not benchmarked automatically:
-- C4.5
-- GUIDE
-
-Reason: production-grade Python support for C4.5 and GUIDE is limited and inconsistent compared with the models above.
-
-## Local setup
-
-```bash
-pip install -r requirements.txt
-streamlit run app.py
-```
-
-## Streamlit Cloud / GitHub deployment
-
-1. Create a new GitHub repository.
-2. Upload these files:
-   - `app.py`
-   - `requirements.txt`
-   - `README.md`
-3. Push to GitHub.
-4. In Streamlit Community Cloud, create a new app from that repository.
-5. Set the main file path to:
-
-```bash
-app.py
-```
-
-## Recommended repository structure
-
-```text
-tree_cv_dashboard/
+## 🚀 Features
+### 🔍 Model Explorer
+Select from ~50+ model pipelines
+View:
+Accuracy
+F1 score
+Quickly compare model performance
+### 📊 Model Comparison
+Visualize accuracy across model families:
+Tree-based models
+Bagging methods
+Boosting methods
+Identify which approaches perform best on your data
+### 🧠 Feature Engineering Insights
+Built-in explanation panel describing all computed features
+Covers:
+Global geometry
+PCA-based shape descriptors
+Local neighborhood structure
+Clustering behavior
+Convex hull metrics
+## 📁 Project Structure
+.
 ├── app.py
-├── requirements.txt
-└── README.md
-```
+├── Data/
+│   ├── feasible/
+│   │   ├── *.ply
+│   └── infeasible/
+│       ├── *.ply
+├── README.md
+## 📦 Installation
 
-## Notes
+Install dependencies:
 
-- The app automatically handles missing values with imputation.
-- Categorical variables are encoded automatically.
-- Classification uses stratified K-fold by default.
-- Regression uses shuffled K-fold.
-- For large datasets, boosted models may take longer to run.
-- If Streamlit Cloud memory is tight, remove optional packages you do not need from `requirements.txt`.
+pip install -r requirements.txt
 
-## Suggested next extensions
+Or manually:
 
-- SHAP explainability panel
-- Hyperparameter tuning tab
-- Model comparison plots with statistical tests
-- PDF report export
-- Per-fold predictions and residual diagnostics
+pip install streamlit numpy pandas matplotlib scipy scikit-learn plyfile umap-learn
+## ▶️ Running the App
+streamlit run app.py
+## 📊 Data Format
+Input files must be .ply point clouds
+Each file should contain:
+x, y, z vertex coordinates
+
+Directory structure is required:
+
+Data/
+├── feasible/
+└── infeasible/
+
+The label is inferred from the folder name.
+
+## ⚙️ Feature Engineering
+
+Each point cloud is converted into a feature vector using:
+
+Global Features
+Mean (X, Y, Z)
+Standard deviation
+Bounding box dimensions
+Bounding box volume
+PCA-Based Shape Features
+Eigenvalues of covariance matrix
+Linearity, planarity, scattering ratios
+Local Geometry
+Nearest neighbor distances (mean, std)
+Clustering (DBSCAN)
+Number of clusters
+Largest cluster ratio
+Cluster size statistics
+KMeans Features
+Cluster centers (k=3)
+Convex Hull Metrics
+Surface area
+Volume
+Compactness ratio
+## 🤖 Models Evaluated
+
+The app evaluates a wide variety of classifiers, including:
+
+Logistic Regression
+Support Vector Machines (multiple kernels)
+k-Nearest Neighbors (multiple distance metrics)
+Decision Trees
+Random Forest
+Gradient Boosting
+AdaBoost
+Bagging
+Extra Trees
+Naive Bayes
+LDA
+Neural Networks (MLP)
+SGD / Passive-Aggressive
+Gaussian Processes
+Radius Neighbors
+
+Each model is tested:
+
+With and without feature scaling
+Using a consistent train/test split
+## 🧪 Experimental Setup
+Train/test split: 70/30
+Stratified sampling
+Metrics:
+Accuracy
+F1 score (primary ranking metric)
+## ⚠️ Notes on Performance
+Feature extraction can be computationally expensive:
+DBSCAN
+Convex Hull
+KMeans
+Use small datasets (10–20 samples per class) for best performance on Streamlit Cloud
+Results are cached to improve responsiveness
+## 🌐 Deployment
+
+This app is designed to run on Streamlit Cloud.
+
+To deploy:
+
+Push this repo to GitHub
+Connect it to Streamlit Cloud
+Ensure the Data/ folder is included in the repo
+🔮 Future Improvements
+Interactive 3D visualization (Plotly)
+Confusion matrices and ROC curves
+Feature importance analysis
+Precomputed feature caching
+Larger-scale dataset support
+
+## License
+Please never use this code for anything, for your own sake.
