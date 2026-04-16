@@ -344,8 +344,11 @@ def run(X, y, label):
     print(f"\n==== {label} ====")
 
     for name, m in models.items():
-        print(f"=> Training {name}... ", end="")
+        # print(f"=> Training {name}... ", end="")
 
+        if "bagging" not in name and "boosting" not in name and "tree" not in name and "forest" not in name:
+            continue  # only use subset for Streamlit's sake
+        
         try:
             m.fit(Xtr, ytr)
             preds = m.predict(Xte)
@@ -378,9 +381,9 @@ def run(X, y, label):
 # MAIN
 # =========================
 
-# set to 10 for the poor streamlit server's sake
-NUM_FEASIBLE = 10
-NUM_INFEASIBLE = 10
+# set to 10 total for the poor streamlit server's sake
+NUM_FEASIBLE = 5
+NUM_INFEASIBLE = 5
 
 data = read_data(NUM_FEASIBLE, NUM_INFEASIBLE)
 
@@ -398,6 +401,7 @@ df_infeasible = data[infeasible_key]
 # -------------------------
 print("\n=== VISUAL VALIDATION ===")
 
+"""
 # ---- Feasible sample
 visualize_3d(df_feasible, f"{feasible_key} - ORIGINAL")
 pca_plot(df_feasible, f"{feasible_key} - PCA BEFORE")
@@ -415,15 +419,16 @@ df_infeasible_filt = filter_plane(df_infeasible, z_thresh=df_infeasible["Z"].min
 
 visualize_3d(df_infeasible_filt, f"{infeasible_key} - FILTERED")
 pca_plot(df_infeasible_filt, f"{infeasible_key} - PCA AFTER")
+"""
 
 # -------------------------
 # Build datasets
 # -------------------------
-X_u, y_u = build_dataset(data, filtered=False)
+# X_u, y_u = build_dataset(data, filtered=False)
 X_f, y_f = build_dataset(data, filtered=True)
 
 # -------------------------
 # Run experiments
 # -------------------------
-res_u = run(X_u, y_u, "UNFILTERED")
+# res_u = run(X_u, y_u, "UNFILTERED")
 res_f = run(X_f, y_f, "FILTERED")
