@@ -17,8 +17,6 @@ from pathlib import Path
 
 from sklearn.decomposition import PCA
 from sklearn.cluster import DBSCAN, KMeans
-from sklearn.preprocessing import StandardScaler
-from sklearn.pipeline import Pipeline
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score, f1_score, confusion_matrix
 
@@ -222,7 +220,7 @@ if st.sidebar.button("2. Train Models"):
 tab1, tab2, tab3 = st.tabs(["Point Cloud Viewer", "Model Viewer", "Comparison"])
 
 # -------------------------
-# TAB 1: INTERACTIVE VIS
+# TAB 1: POINT CLOUD
 # -------------------------
 with tab1:
     if st.session_state.data:
@@ -232,45 +230,51 @@ with tab1:
         col1, col2 = st.columns(2)
 
         with col1:
-            st.subheader("Interactive 3D View")
+            st.subheader("3D View")
             df_plot = downsample(df)
 
             fig = px.scatter_3d(
                 df_plot,
                 x="X", y="Y", z="Z",
                 color="Z",
-                opacity=0.6
+                opacity=0.6,
+                height=400
             )
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, use_container_width=False)
 
         with col2:
             st.subheader("PCA Projection")
             xyz = df[["X","Y","Z"]].values
             reduced = PCA(n_components=2).fit_transform(xyz)
 
-            fig2, ax2 = plt.subplots()
+            fig2, ax2 = plt.subplots(figsize=(5,4))
             ax2.scatter(reduced[:,0], reduced[:,1], s=2)
             st.pyplot(fig2)
 
 # -------------------------
-# TAB 2: MODEL DETAILS
+# TAB 2: MODEL VIEWER
 # -------------------------
 with tab2:
     if st.session_state.results:
         model_name = st.selectbox("Model", list(st.session_state.results.keys()))
         metrics = st.session_state.results[model_name]
 
-        st.write(metrics)
+        col1, col2 = st.columns(2)
 
-        model = st.session_state.models[model_name]
-        preds = model.predict(st.session_state.Xte)
+        with col1:
+            st.subheader("Metrics")
+            st.write(metrics)
 
-        cm = confusion_matrix(st.session_state.yte, preds)
+        with col2:
+            st.subheader("Confusion Matrix")
+            model = st.session_state.models[model_name]
+            preds = model.predict(st.session_state.Xte)
 
-        fig, ax = plt.subplots()
-        sns.heatmap(cm, annot=True, fmt="d", cmap="Blues", ax=ax)
-        ax.set_title("Confusion Matrix")
-        st.pyplot(fig)
+            cm = confusion_matrix(st.session_state.yte, preds)
+
+            fig, ax = plt.subplots(figsize=(5,4))
+            sns.heatmap(cm, annot=True, fmt="d", cmap="Blues", ax=ax)
+            st.pyplot(fig)
 
 # -------------------------
 # TAB 3: COMPARISON
@@ -285,11 +289,22 @@ with tab3:
             default=list(results.keys())
         )
 
-        accs = [results[m]["accuracy"] for m in selected]
+        col1, col2 = st.columns(2)
 
-        fig, ax = plt.subplots()
-        ax.bar(selected, accs)
-        ax.set_ylabel("Accuracy")
-        ax.set_xticklabels(selected, rotation=45, ha="right")
+        with col1:
+            accs = [results[m]["accuracy"] for m in selected]
 
-        st.pyplot(fig)
+            fig, ax = plt.subplots(figsize=(5,4))
+            ax.bar(selected, accs)
+            ax.set_title("Accuracy")
+            ax.set_xticklabels(selected, rotation=45, ha="right")
+            st.pyplot(fig)
+
+        with col2:
+            f1s = [results[m]["f1"] for m in selected]
+
+            fig2, ax2 = plt.subplots(figsize=(5,4))
+            ax2.bar(selected, f1s)
+            ax2.set_title("F1 Score")
+            ax2.set_xticklabels(selected, rotation=45, ha="right")
+            st.pyplot(fig2)
