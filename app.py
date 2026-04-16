@@ -10,6 +10,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
+import plotly.express as px
 
 from plyfile import PlyData
 from pathlib import Path
@@ -40,6 +41,13 @@ st.set_page_config(layout="wide")
 st.title("3D Point Cloud Explorer")
 
 # -------------------------
+# SIDEBAR NOTE
+# -------------------------
+st.sidebar.info(
+    "Note: This app uses a limited dataset due to storage and performance constraints."
+)
+
+# -------------------------
 # SESSION STATE
 # -------------------------
 for key in ["data", "X", "y", "results", "Xte", "yte", "models"]:
@@ -47,7 +55,7 @@ for key in ["data", "X", "y", "results", "Xte", "yte", "models"]:
         st.session_state[key] = None
 
 # -------------------------
-# LOAD + BUILD (COMBINED)
+# LOAD + BUILD
 # -------------------------
 def load_xyz_from_ply(path):
     ply = PlyData.read(path)
@@ -69,14 +77,13 @@ def load_and_build(nf, ni):
     X, y = [], []
     for k, df in data.items():
         df = df[df["Z"] > df["Z"].min() + 2]
-
         X.append(extract_features(df))
         y.append(k.startswith("feasible"))
 
     return data, np.array(X), np.array(y)
 
 # -------------------------
-# FEATURES (UNCHANGED)
+# FEATURES
 # -------------------------
 def extract_features(df):
     xyz = df[["X","Y","Z"]].values
@@ -169,8 +176,16 @@ def run_models(X, y):
 
     return results, trained, Xte, yte
 
+# -------------------------
+# HELPERS
+# -------------------------
+def downsample(df, n=5000):
+    if len(df) > n:
+        return df.sample(n)
+    return df
+
 # =========================
-# SIDEBAR
+# SIDEBAR CONTROLS
 # =========================
 st.sidebar.header("Controls")
 
@@ -188,14 +203,17 @@ if st.sidebar.button("2. Train Models"):
     if st.session_state.X is None:
         st.warning("Build dataset first")
     else:
-        results, models, Xte, yte = run_models(
-            st.session_state.X,
-            st.session_state.y
-        )
-        st.session_state.results = results
-        st.session_state.models = models
-        st.session_state.Xte = Xte
-        st.session_state.yte = yte
+        with st.spinner("Training models..."):
+            results, models, Xte, yte = run_models(
+                st.session_state.X,
+                st.session_state.y
+            )
+
+            st.session_state.results = results
+            st.session_state.models = models
+            st.session_state.Xte = Xte
+            st.session_state.yte = yte
+
         st.success("Training complete")
 
 # =========================
@@ -204,7 +222,7 @@ if st.sidebar.button("2. Train Models"):
 tab1, tab2, tab3 = st.tabs(["Point Cloud Viewer", "Model Viewer", "Comparison"])
 
 # -------------------------
-# TAB 1: VISUALIZATION
+# TAB 1: INTERACTIVE VIS
 # -------------------------
 with tab1:
     if st.session_state.data:
@@ -214,11 +232,16 @@ with tab1:
         col1, col2 = st.columns(2)
 
         with col1:
-            st.subheader("3D View")
-            fig = plt.figure()
-            ax = fig.add_subplot(111, projection='3d')
-            ax.scatter(df["X"], df["Y"], df["Z"], s=1)
-            st.pyplot(fig)
+            st.subheader("Interactive 3D View")
+            df_plot = downsample(df)
+
+            fig = px.scatter_3d(
+                df_plot,
+                x="X", y="Y", z="Z",
+                color="Z",
+                opacity=0.6
+            )
+            st.plotly_chart(fig, use_container_width=True)
 
         with col2:
             st.subheader("PCA Projection")
